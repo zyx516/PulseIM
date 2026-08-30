@@ -1,0 +1,6 @@
+.git
+.m2
+**/target
+web-im/node_modules
+web-im/dist
+web-im/.npm-cache

@@ -1,0 +1,14 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: ${USER_DB_URL:jdbc:mysql://localhost:3306/pulseim_user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true}
+    username: ${PULSEIM_MYSQL_USER:root}
+    password: ${PULSEIM_MYSQL_PASSWORD:pulseim-dev}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    database-platform: org.hibernate.dialect.MySQLDialect
+    open-in-view: false

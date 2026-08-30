@@ -1,0 +1,32 @@
+# Build outputs
+**/target/
+**/dist/
+**/build/
+**/out/
+
+# Frontend dependencies and caches
+**/node_modules/
+web-im/.npm-cache/
+.npm-cache/
+
+# Local runtime files
+logs/
+*.log
+*.pid
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+application-local.yml
+application-local.yaml
+
+# IDE and OS files
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Maven local cache used during local experiments
+.m2/

@@ -1,0 +1,145 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    ports: ["3306:3306"]
+    volumes: ["./infra/mysql:/docker-entrypoint-initdb.d:ro", "mysql-data:/var/lib/mysql"]
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-p${MYSQL_ROOT_PASSWORD:-pulseim-dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7.4-alpine
+    ports: ["6379:6379"]
+    command: redis-server --appendonly yes
+    volumes: ["redis-data:/data"]
+
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    ports: ["5672:5672", "15672:15672"]
+    volumes: ["rabbitmq-data:/var/lib/rabbitmq"]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  nacos:
+    image: nacos/nacos-server:v2.4.2
+    environment: [MODE=standalone]
+    ports: ["8848:8848"]
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    profiles: [observability]
+    ports: ["9090:9090"]
+    volumes: ["./infra/prometheus.yml:/etc/prometheus/prometheus.yml:ro"]
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    profiles: [observability]
+    ports: ["3000:3000"]
+    volumes: ["grafana-data:/var/lib/grafana"]
+
+  api-gateway:
+    build: { context: ., args: { MODULE: api-gateway } }
+    ports: ["8080:8080"]
+    environment:
+      AUTH_SERVICE_URI: http://auth-service:8081
+      USER_SERVICE_URI: http://user-service:8082
+      SOCIAL_SERVICE_URI: http://social-service:8083
+      CONVERSATION_SERVICE_URI: http://conversation-service:8084
+      MESSAGE_SERVICE_URI: http://message-service:8085
+      MEDIA_SERVICE_URI: http://media-service:8086
+      MODERATION_SERVICE_URI: http://moderation-service:8087
+    depends_on: [auth-service, user-service, social-service, conversation-service, message-service, media-service, moderation-service]
+
+  auth-service:
+    build: { context: ., args: { MODULE: auth-service } }
+    ports: ["8081:8081"]
+    environment:
+      AUTH_DB_URL: jdbc:mysql://mysql:3306/pulseim_auth?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  user-service:
+    build: { context: ., args: { MODULE: user-service } }
+    ports: ["8082:8082"]
+    environment:
+      USER_DB_URL: jdbc:mysql://mysql:3306/pulseim_user?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  social-service:
+    build: { context: ., args: { MODULE: social-service } }
+    ports: ["8083:8083"]
+    environment:
+      SOCIAL_DB_URL: jdbc:mysql://mysql:3306/pulseim_social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  conversation-service:
+    build: { context: ., args: { MODULE: conversation-service } }
+    ports: ["8084:8084"]
+    environment:
+      CONVERSATION_DB_URL: jdbc:mysql://mysql:3306/pulseim_conversation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  message-service:
+    build: { context: ., args: { MODULE: message-service } }
+    ports: ["8085:8085"]
+    environment:
+      MESSAGE_DB_URL: jdbc:mysql://mysql:3306/pulseim_message?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    depends_on: [mysql, rabbitmq]
+
+  media-service:
+    build: { context: ., args: { MODULE: media-service } }
+    ports: ["8086:8086"]
+    environment:
+      MEDIA_DB_URL: jdbc:mysql://mysql:3306/pulseim_media?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  moderation-service:
+    build: { context: ., args: { MODULE: moderation-service } }
+    ports: ["8087:8087"]
+    environment:
+      MODERATION_DB_URL: jdbc:mysql://mysql:3306/pulseim_moderation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
+      PULSEIM_MYSQL_USER: root
+      PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+    depends_on: [mysql]
+
+  im-gateway-1:
+    build: { context: ., args: { MODULE: im-gateway } }
+    environment: [IM_PORT=8090, IM_NODE_ID=im-gateway-1, MESSAGE_SERVICE_URI=http://message-service:8085, REDIS_HOST=redis, RABBITMQ_HOST=rabbitmq, RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}, RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}]
+    ports: ["8090:8090"]
+    depends_on: [redis, rabbitmq, message-service]
+
+  im-gateway-2:
+    build: { context: ., args: { MODULE: im-gateway } }
+    environment: [IM_PORT=8090, IM_NODE_ID=im-gateway-2, MESSAGE_SERVICE_URI=http://message-service:8085, REDIS_HOST=redis, RABBITMQ_HOST=rabbitmq, RABBITMQ_USERNAME=${RABBITMQ_USERNAME:-guest}, RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD:-guest}]
+    ports: ["8091:8090"]
+    depends_on: [redis, rabbitmq, message-service]
+
+volumes:
+  mysql-data:
+  redis-data:
+  rabbitmq-data:
+  grafana-data:
