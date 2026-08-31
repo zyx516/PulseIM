@@ -1,16 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
-import { Avatar, Badge, Button, Divider, Empty, Input, Tooltip } from 'antd';
+import { Avatar, Badge, Button, Divider, Drawer, Empty, Input, Timeline, Tooltip } from 'antd';
 import {
   BellOutlined, CommentOutlined, ContactsOutlined, EllipsisOutlined, LockOutlined,
   LogoutOutlined, MoreOutlined, PaperClipOutlined, SearchOutlined, SendOutlined,
   SettingOutlined, SmileOutlined, UserAddOutlined
 } from '@ant-design/icons';
-import { history, login, register, type Session } from './api/client';
+import { delivery, history, login, register, type DeliveryEvent, type Session } from './api/client';
 import { useUiStore } from './store/ui';
 
 type Delivery = 'sending' | 'sent' | 'syncing';
-type ChatMessage = { id: string; text: string; from: 'me' | 'other'; at: string; status?: Delivery };
+type ChatMessage = { id: string; serverId?: string; text: string; from: 'me' | 'other'; at: string; status?: Delivery };
 type Contact = { id: string; userId: string; name: string; initial: string; color: string; online: boolean; preview: string; time: string; unread?: number };
 
 const contacts: Contact[] = [
@@ -90,6 +90,9 @@ function MessageLayout({ session }: { session: Session }) {
   const { activeId, setActiveId } = useUiStore();
   const [messages, setMessages] = useState(initialMessages);
   const [connection, setConnection] = useState<'connecting' | 'online' | 'offline'>('connecting');
+  const [traceMessage, setTraceMessage] = useState<ChatMessage | null>(null);
+  const [trace, setTrace] = useState<DeliveryEvent[]>([]);
+  const [traceLoading, setTraceLoading] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const visibleContacts = session.userId === 'u-ava'
     ? [{ id: 'pulse', userId: 'u-pulse', name: 'Pulse', initial: 'P', color: '#246BEB', online: true, preview: '欢迎来体验 PulseIM。', time: '刚刚' }]
@@ -106,10 +109,13 @@ function MessageLayout({ session }: { session: Session }) {
       socketRef.current = socket;
       socket.onopen = () => socket.send(JSON.stringify({ version: '1', requestId: crypto.randomUUID(), command: 'AUTH', data: { token: session.accessToken } }));
     socket.onmessage = (event) => {
-      const envelope = JSON.parse(event.data) as { type: string; data: { clientMessageId?: string; content?: string; fromUserId?: string; conversationId?: string } };
+      const envelope = JSON.parse(event.data) as { type: string; data: { id?: string; messageId?: string; clientMessageId?: string; content?: string; fromUserId?: string; conversationId?: string } };
       if (envelope.type === 'AUTHENTICATED') setConnection('online');
-      if (envelope.type === 'MESSAGE_ACCEPTED' && envelope.data.clientMessageId) setMessages((current) => current.map((item) => item.id === envelope.data.clientMessageId ? { ...item, status: 'sent' } : item));
-      if (envelope.type === 'MESSAGE_EVENT' && envelope.data.content && envelope.data.conversationId === conversationId) setMessages((current) => [...current, { id: crypto.randomUUID(), text: envelope.data.content!, from: 'other', at: now() }]);
+      if (envelope.type === 'MESSAGE_ACCEPTED' && envelope.data.clientMessageId) setMessages((current) => current.map((item) => item.id === envelope.data.clientMessageId ? { ...item, serverId: envelope.data.messageId, status: 'sent' } : item));
+      if (envelope.type === 'MESSAGE_EVENT' && envelope.data.content && envelope.data.conversationId === conversationId) {
+        setMessages((current) => current.some((item) => item.serverId === envelope.data.id) ? current : [...current, { id: envelope.data.id ?? crypto.randomUUID(), serverId: envelope.data.id, text: envelope.data.content!, from: 'other', at: now() }]);
+        if (envelope.data.id) socket.send(JSON.stringify({ version: '1', requestId: crypto.randomUUID(), command: 'ACK', data: { messageId: envelope.data.id } }));
+      }
     };
       socket.onerror = () => socket.close();
       socket.onclose = () => { if (!disposed) { setConnection('offline'); reconnectTimer = window.setTimeout(connect, 2000); } };
@@ -125,6 +131,11 @@ function MessageLayout({ session }: { session: Session }) {
     }).catch(() => setMessages([]));
   }, [conversationId, session.accessToken, session.userId]);
 
+  useEffect(() => {
+    if (!traceMessage?.serverId) { setTrace([]); return; }
+    setTraceLoading(true);
+    delivery(session.accessToken, traceMessage.serverId).then(setTrace).catch(() => setTrace([])).finally(() => setTraceLoading(false));
+  }, [session.accessToken, traceMessage]);
   function send(text: string) {
     const clientMessageId = crypto.randomUUID();
     setMessages((current) => [...current, { id: clientMessageId, text, from: 'me', at: now(), status: connection === 'online' ? 'sending' : 'syncing' }]);
@@ -137,15 +148,16 @@ function MessageLayout({ session }: { session: Session }) {
         <PulseAvatar contact={contact} /><span className="conversation-copy"><span><strong>{contact.name}</strong><time>{contact.time}</time></span><small>{contact.preview}</small></span>{contact.unread && <b className="unread">{contact.unread}</b>}</button>)}</div>
     </aside>
     <section className="chat-pane"><header className="chat-header"><div className="contact-title"><PulseAvatar contact={active} /><div><h2>{active.name}</h2><p><span className={`tiny-dot ${connection}`} />{connection === 'online' ? '已连接' : connection === 'connecting' ? '正在连接' : '离线，消息将等待同步'}</p></div></div><div><Tooltip title="会话详情"><button className="icon-button"><EllipsisOutlined /></button></Tooltip></div></header>
-      <div className="message-scroller"><div className="day-label">今天</div>{messages.map((message) => <MessageBubble key={message.id} message={message} />)}</div>
+      <div className="message-scroller"><div className="day-label">今天</div>{messages.map((message) => <MessageBubble key={message.id} message={message} onTrace={() => setTraceMessage(message)} />)}</div>
       <Composer onSend={send} disabled={false} />
     </section>
-    <aside className="detail-pane"><div className="detail-heading"><PulseAvatar contact={active} size={68} /><h3>{active.name}</h3><p>{active.online ? '在线 · 可接收消息' : '暂时离线'}</p></div><Divider /><section className="detail-section"><span>会话偏好</span><button>消息免打扰 <i /></button><button>置顶会话 <i /></button></section><section className="detail-section"><span>成员</span><div className="member-row"><PulseAvatar contact={active} size={30} /><span>{active.name}</span></div></section></aside>
+    <DeliveryDrawer message={traceMessage} events={trace} loading={traceLoading} onClose={() => setTraceMessage(null)} />`r`n    <aside className="detail-pane"><div className="detail-heading"><PulseAvatar contact={active} size={68} /><h3>{active.name}</h3><p>{active.online ? '在线 · 可接收消息' : '暂时离线'}</p></div><Divider /><section className="detail-section"><span>会话偏好</span><button>消息免打扰 <i /></button><button>置顶会话 <i /></button></section><section className="detail-section"><span>成员</span><div className="member-row"><PulseAvatar contact={active} size={30} /><span>{active.name}</span></div></section></aside>
   </>;
 }
 
 function PulseAvatar({ contact, size = 42 }: { contact: Contact; size?: number }) { return <span className={`pulse-avatar ${contact.online ? 'online' : ''}`}><Avatar size={size} style={{ background: contact.color }}>{contact.initial}</Avatar></span>; }
-function MessageBubble({ message }: { message: ChatMessage }) { return <article className={`message-row ${message.from}`}><div className="bubble">{message.text}<footer><time>{message.at}</time>{message.from === 'me' && <span className={`delivery ${message.status ?? ''}`}>{message.status === 'sending' ? '发送中' : message.status === 'syncing' ? '等待同步' : '已送达'}</span>}</footer></div></article>; }
+function MessageBubble({ message, onTrace }: { message: ChatMessage; onTrace: () => void }) { return <article className={`message-row ${message.from}`}><button className="bubble" onClick={onTrace} aria-label="查看消息投递轨迹">{message.text}<footer><time>{message.at}</time>{message.from === 'me' && <span className={`delivery ${message.status ?? ''}`}>{message.status === 'sending' ? '发送中' : message.status === 'syncing' ? '等待同步' : '已送达'}</span>}</footer></button></article>; }
+function DeliveryDrawer({ message, events, loading, onClose }: { message: ChatMessage | null; events: DeliveryEvent[]; loading: boolean; onClose: () => void }) { return <Drawer title="消息投递轨迹" open={Boolean(message)} onClose={onClose} width={360}><p className="trace-copy">{message?.text ?? ''}</p>{message?.serverId ? <Timeline pending={loading ? '加载中' : false} items={events.map((event) => ({ color: event.stage.includes('DEAD') ? 'red' : event.stage.includes('RETRY') ? 'orange' : 'blue', children: <><strong>{event.stage}</strong><p>{event.detail} · {formatTime(event.occurredAt)}</p></> }))} /> : <Empty description="消息正在等待服务端确认" />}</Drawer>; }
 function Composer({ onSend, disabled }: { onSend: (text: string) => void; disabled: boolean }) { const [value, setValue] = useState(''); const submit = () => { if (!value.trim()) return; onSend(value.trim()); setValue(''); }; return <div className="composer"><div className="compose-tools"><button aria-label="添加表情"><SmileOutlined /></button><button aria-label="添加附件"><PaperClipOutlined /></button></div><Input.TextArea value={value} onChange={(event) => setValue(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit(); } }} placeholder="写点什么…" autoSize={{ minRows: 1, maxRows: 4 }} disabled={disabled} /><Button type="primary" shape="circle" icon={<SendOutlined />} onClick={submit} aria-label="发送消息" /></div>; }
 function Contacts() { return <section className="empty-view"><div><ContactsOutlined /><h2>联系人</h2><p>好友申请与联系人管理会显示在这里。</p><Button type="primary">添加联系人</Button></div></section>; }
 function Settings({ session, onLogout }: { session: Session; onLogout: () => void }) { return <section className="settings-view"><p className="eyebrow blue">安全</p><h1>登录设备</h1><div className="device-card"><span className="device-icon"><LockOutlined /></span><div><strong>当前浏览器</strong><p>{session.userId} · 正在使用</p></div><span className="current">当前设备</span></div><Button danger icon={<LogoutOutlined />} onClick={onLogout}>退出当前设备</Button></section>; }

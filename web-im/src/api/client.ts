@@ -28,3 +28,12 @@ export async function history(accessToken: string, conversationId: string): Prom
   if (!response.ok) throw new Error('无法加载历史消息。');
   return (await response.json()).data;
 }
+
+export type DeliveryEvent = { stage: string; detail: string; occurredAt: string };
+export async function delivery(accessToken: string, messageId: string): Promise<DeliveryEvent[]> {
+  const response = await fetch(`${apiBase}/api/messages/${encodeURIComponent(messageId)}/delivery`, {
+    headers: { Authorization: `Bearer ${accessToken}`, 'X-Trace-Id': crypto.randomUUID() }
+  });
+  if (!response.ok) throw new Error('无法加载投递轨迹。');
+  return (await response.json()).data;
+}

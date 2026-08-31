@@ -144,3 +144,4 @@ npm run build
 - `PULSEIM_JWT_SECRET`
 
 不要提交真实 `.env`、日志、数据库 dump、私钥或线上用户数据。
+# PulseIM

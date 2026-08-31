@@ -118,7 +118,7 @@ public class WebSocketServer implements SmartLifecycle {
                         send(context, envelope.requestId(), "PONG", Map.of("at", Instant.now().toString()));
                     }
                     case "SEND_MESSAGE" -> sendMessage(context, envelope);
-                    case "ACK", "READ" -> requireSession(context, envelope.requestId());
+                    case "ACK", "READ" -> acknowledge(context, envelope);
                     default -> send(context, envelope.requestId(), "ERROR", Map.of("code", "UNKNOWN_COMMAND"));
                 }
             } catch (Exception exception) {
@@ -138,6 +138,13 @@ public class WebSocketServer implements SmartLifecycle {
             connections.register(session, context.channel());
             presence.online(session);
             send(context, envelope.requestId(), "AUTHENTICATED", Map.of("userId", session.userId(), "deviceId", session.deviceId()));
+        }
+
+        private void acknowledge(ChannelHandlerContext context, WsEnvelope envelope) {
+            JwtSupport.Session session = requireSession(context, envelope.requestId());
+            JsonNode messageId = envelope.data() == null ? null : envelope.data().get("messageId");
+            if (session == null || messageId == null || messageId.asText().isBlank()) return;
+            messageServiceClient.acknowledge(context.channel().attr(ACCESS_TOKEN).get(), envelope.requestId(), messageId.asText(), "READ".equals(envelope.command()) ? "READ" : "ACK");
         }
 
         private void sendMessage(ChannelHandlerContext context, WsEnvelope envelope) {
