@@ -37,7 +37,7 @@ class LocalConnectionRegistry {
     }
 
     void push(MessagePersistedEvent event, String requestId) {
-        if (!pushedMessages.add(event.messageId())) {
+        if (!pushedMessages.add(event.messageId() + ":" + event.toUserId())) {
             return;
         }
         ChannelGroup targets = channelsByUser.get(event.toUserId());

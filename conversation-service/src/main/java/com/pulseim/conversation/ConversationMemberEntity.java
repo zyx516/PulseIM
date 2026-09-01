@@ -11,7 +11,7 @@ import java.time.Instant;
 class ConversationMemberEntity {
     @Id
     private String id;
-    @Column(name = "conversation_id", nullable = false, length = 80)
+    @Column(name = "conversation_id", nullable = false, length = 180)
     private String conversationId;
     @Column(name = "user_id", nullable = false, length = 80)
     private String userId;

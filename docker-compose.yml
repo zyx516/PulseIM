@@ -85,7 +85,10 @@ services:
       SOCIAL_DB_URL: jdbc:mysql://mysql:3306/pulseim_social?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
       PULSEIM_MYSQL_USER: root
       PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
-    depends_on: [mysql]
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    depends_on: [mysql, rabbitmq]
 
   conversation-service:
     build: { context: ., args: { MODULE: conversation-service } }
@@ -94,7 +97,10 @@ services:
       CONVERSATION_DB_URL: jdbc:mysql://mysql:3306/pulseim_conversation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
       PULSEIM_MYSQL_USER: root
       PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
-    depends_on: [mysql]
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
+    depends_on: [mysql, rabbitmq]
 
   message-service:
     build: { context: ., args: { MODULE: message-service } }
@@ -103,6 +109,7 @@ services:
       MESSAGE_DB_URL: jdbc:mysql://mysql:3306/pulseim_message?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true
       PULSEIM_MYSQL_USER: root
       PULSEIM_MYSQL_PASSWORD: ${MYSQL_ROOT_PASSWORD:-pulseim-dev}
+      CONVERSATION_SERVICE_URI: http://conversation-service:8084
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}

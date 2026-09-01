@@ -12,3 +12,10 @@ spring:
       ddl-auto: update
     database-platform: org.hibernate.dialect.MySQLDialect
     open-in-view: false
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+pulseim:
+  group-events-exchange: pulseim.group.events

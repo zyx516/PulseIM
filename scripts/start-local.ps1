@@ -4,7 +4,9 @@ param(
   [string]$RabbitHost = "localhost",
   [string]$RabbitUsername = "guest",
   [string]$RabbitPassword = "guest",
-  [string]$RedisHost = "localhost"
+  [string]$RedisHost = "localhost",
+  [string]$ImNodeId = "im-gateway-local-dlx",
+  [string]$ImPort = "8090"
 )
 
 $workspace = Split-Path -Parent $PSScriptRoot
@@ -17,6 +19,8 @@ $env:RABBITMQ_HOST = $RabbitHost
 $env:RABBITMQ_USERNAME = $RabbitUsername
 $env:RABBITMQ_PASSWORD = $RabbitPassword
 $env:REDIS_HOST = $RedisHost
+$env:IM_NODE_ID = $ImNodeId
+$env:IM_PORT = $ImPort
 
 $services = @(
   @{Name="auth-service"; Jar="auth-service\target\auth-service-0.1.0-SNAPSHOT.jar"},

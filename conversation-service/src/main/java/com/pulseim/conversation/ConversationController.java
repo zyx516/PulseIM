@@ -58,12 +58,22 @@ public class ConversationController {
         String userId = BearerTokens.require(authorization).userId();
         String conversationId = "gc-" + command.groupId();
         ConversationEntity conversation = conversations.findById(conversationId)
-                .orElseGet(() -> conversations.save(new ConversationEntity(conversationId, "GROUP", null, null, command.groupId(), Instant.now())));
-        members.ensureMember(conversation.id(), userId);
-        ConversationMemberEntity member = members.findByConversationIdAndUserId(conversation.id(), userId).orElseThrow();
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Group conversation not synced yet"));
+        ConversationMemberEntity member = members.findByConversationIdAndUserId(conversation.id(), userId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Conversation member not found"));
         return ApiResponse.ok(TraceIds.from(traceId), ConversationView.from(conversation, member));
     }
 
+    @GetMapping("/{conversationId}/members")
+    public ApiResponse<List<ConversationMemberView>> conversationMembers(@RequestHeader("Authorization") String authorization,
+                                                                           @RequestHeader(value = "X-Trace-Id", required = false) String traceId,
+                                                                           @PathVariable String conversationId) {
+        String userId = BearerTokens.require(authorization).userId();
+        members.findByConversationIdAndUserId(conversationId, userId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Conversation member not found"));
+        return ApiResponse.ok(TraceIds.from(traceId), members.findByConversationId(conversationId).stream()
+                .map(member -> new ConversationMemberView(member.userId(), member.readSequence(), member.pinned(), member.muted())).toList());
+    }
     @PostMapping("/{conversationId}/read")
     @Transactional
     public ApiResponse<ConversationView> read(@RequestHeader("Authorization") String authorization,
@@ -112,6 +122,8 @@ public class ConversationController {
     private static String directConversationId(String left, String right) {
         return left.compareTo(right) <= 0 ? "direct-" + left + "-" + right : "direct-" + right + "-" + left;
     }
+
+    public record ConversationMemberView(String userId, long readSequence, boolean pinned, boolean muted) { }
 
     public record DirectConversationCommand(String peerUserId) {
     }

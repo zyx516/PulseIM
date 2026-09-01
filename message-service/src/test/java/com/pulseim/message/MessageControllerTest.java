@@ -27,7 +27,7 @@ class MessageControllerTest {
     @Test
     void repeatsClientMessageIdWithoutCreatingAnotherMessage() {
         String authorization = "Bearer " + JwtSupport.issue("u-sender", "web", Duration.ofMinutes(1));
-        MessageController.SendMessageCommand command = new MessageController.SendMessageCommand("client-1", "c-1", "u-recipient", "hello");
+        MessageController.SendMessageCommand command = new MessageController.SendMessageCommand("client-1", "c-1", "u-recipient", "hello", null, null, null);
 
         ApiResponse<MessageView> first = controller.send(authorization, "trace-a", command);
         ApiResponse<MessageView> repeated = controller.send(authorization, "trace-b", command);

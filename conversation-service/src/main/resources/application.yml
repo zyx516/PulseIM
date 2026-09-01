@@ -7,6 +7,11 @@ spring:
     url: ${CONVERSATION_DB_URL:jdbc:mysql://localhost:3306/pulseim_conversation?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&createDatabaseIfNotExist=true}
     username: ${PULSEIM_MYSQL_USER:root}
     password: ${PULSEIM_MYSQL_PASSWORD:pulseim-dev}
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USERNAME:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
   jpa:
     hibernate:
       ddl-auto: update

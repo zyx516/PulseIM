@@ -9,7 +9,7 @@ class OutboxEventEntity {
     @Id private String id;
     @Column(nullable = false, length = 60) private String type;
     @Column(name = "aggregate_id", nullable = false, length = 80) private String aggregateId;
-    @Lob @Column(nullable = false) private String payload;
+    @Lob @Column(nullable = false, columnDefinition = "MEDIUMTEXT") private String payload;
     @Column(nullable = false, length = 20) private String status;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "published_at") private Instant publishedAt;

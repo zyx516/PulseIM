@@ -34,4 +34,5 @@ class GroupMemberEntity {
     String userId() { return userId; }
     String role() { return role; }
     Instant joinedAt() { return joinedAt; }
+    void changeRole(String role) { this.role = role; }
 }
